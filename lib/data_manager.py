@@ -2,7 +2,6 @@ import logging
 import inspect
 from datetime import datetime, timedelta, time 
 
-INSTRUMENT_TOKEN = 256265
 
 
 def print_log(*args):
@@ -19,6 +18,7 @@ def print_log(*args):
 class DataManager:
 
     def __init__(self, broker):
+        self.INSTRUMENT_TOKEN = 256265
         self.broker = broker
         self._get_from_date()
         self.to_date = datetime.now()
@@ -38,7 +38,7 @@ class DataManager:
 
         try:
             raw = self.broker.get_historical_data(
-                instrument_token=INSTRUMENT_TOKEN,
+                instrument_token=self.INSTRUMENT_TOKEN,
                 from_date=from_date,
                 to_date=to_date,
                 interval=interval,

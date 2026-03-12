@@ -38,7 +38,7 @@ class RSI:
         self.rsi_strategy = rsi_strategy
 
     async def get_RSI(self):
-        while True:
+        if True:
             self.data_manager.fetch_all()
             price_dict_15min = self.data_manager.fetch_15min_data()
             price_dict_1hr = self.data_manager.fetch_1hr_data()
@@ -50,7 +50,7 @@ class RSI:
             print_log("RSI_1hr  --> " ,RSI_1hr)
             self.rsi_strategy.update_indicators(RSI_15min,RSI_1hr)
             self.rsi_strategy.run_strategy()
-            await asyncio.sleep(60)
+            # await asyncio.sleep(6)
 
 
 def calculate_indicators(data):

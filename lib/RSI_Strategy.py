@@ -21,6 +21,7 @@ def print_log(*args):
 class RSIStrategy:
 
     def __init__(self):
+        
 
         self.rsi_15min = None
         self.rsi_1hr = None
@@ -28,6 +29,7 @@ class RSIStrategy:
 
         self.status = "inactive"   # inactive / active
         self.position = None       # LONG / SHORT
+        self.quantity = None
 
 
     def update_indicators(self, rsi_15min, rsi_1hr):
