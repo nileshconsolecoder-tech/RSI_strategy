@@ -573,30 +573,30 @@ class brokerSession:
                 "SA": 0.0,
         }
 
-    def place_order(self, record):
+    # def place_order(self, record):
     
-        try:
+    #     try:
             
-            print_log(f"Placing order: {record}")
-            order_id = self.kite.place_order(
-                variety="regular",
-                exchange=record['exchange'],
-                tradingsymbol=record['tradingsymbol'],
-                transaction_type=record['transaction_type'],
-                quantity=record['quantity'],
-                product=record['product'],
-                order_type= record['order_type'],
-                price= 0 if record['order_type'].upper() == "MARKET" else record['limit_price']
-            )
+    #         print_log(f"Placing order: {record}")
+    #         order_id = self.kite.place_order(
+    #             variety="regular",
+    #             exchange=record['exchange'],
+    #             tradingsymbol=record['tradingsymbol'],
+    #             transaction_type=record['transaction_type'],
+    #             quantity=record['quantity'],
+    #             product=record['product'],
+    #             order_type= record['order_type'],
+    #             price= 0 if record['order_type'].upper() == "MARKET" else record['limit_price']
+    #         )
 
 
-            if int(order_id):
-                print_log(f"Order placed successfully. Order ID: {order_id}")
+    #         if int(order_id):
+    #             print_log(f"Order placed successfully. Order ID: {order_id}")
 
-            return order_id
-        except Exception as e:
-            print_log(f"Error in place_order: {e}")
-            return None
+    #         return order_id
+    #     except Exception as e:
+    #         print_log(f"Error in place_order: {e}")
+    #         return None
 
 
 
