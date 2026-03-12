@@ -100,7 +100,7 @@ class brokerSession:
         self.load_india_holidays()
         # self.get_funds()
         self.process_index_instrument_tokens()
-        # self.download_instrument_tokens()
+        self.download_instrument_tokens()
         # self.get_positions()
         # print_log("core part is done ")
         # self.start_websocket()
@@ -529,19 +529,20 @@ class brokerSession:
             last_closed_minute += 60
             last_hour -= 1
 
-        return time(hour=last_hour, minute=last_closed_minute)
-
-    
+            return time(hour=last_hour, minute=last_closed_minute)
     def pre_process_instrument_tokens(self):
         try:
             print_log("Pre-processing instrument tokens...")
-            # self.index_to_trade = ['SENSEX', 'NIFTY', 'BANKNIFTY', 'MIDCPNIFTY', 'BANKEX', 'FINNIFTY']
 
             self.instrument_token = {}
             self.tradingsymbol = {}
+
             print_log("self.df shape :", self.df.shape)
+
             for _, data in self.df.iterrows():
+
                 value = data.to_dict()
+
                 instrument_token = value.get('instrument_token')
                 trading_symbol = value.get('tradingsymbol')
 
@@ -551,13 +552,25 @@ class brokerSession:
                 if trading_symbol:
                     self.tradingsymbol[trading_symbol] = value
 
-            print_log(f"final Loaded {len(self.instrument_token)} instrument tokens and {len(self.tradingsymbol)} trading symbols")
+            print_log(
+                f"final Loaded {len(self.instrument_token)} instrument tokens and {len(self.tradingsymbol)} trading symbols"
+            )
+
+            # ========================
+            # Save only required data
+            # ========================
+
+            csv_file = "instrument_mapping.csv"
+
+            self.df[["instrument_token", "tradingsymbol"]].to_csv(
+                csv_file,
+                index=False
+            )
+            # print_log(self.tradingsymbol["BANKEX26MAR68300PE"])
+            print_log("Saved instrument mapping to:", csv_file)
 
         except Exception as e:
             print_log("Error in pre_process_instrument_tokens", e)
-
-
-
     def expiry_dates(self, index):
         dates = sorted(self.contract_hub[index].keys())
         return dates

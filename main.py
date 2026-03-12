@@ -141,6 +141,7 @@ class TradingFrame(MyFrame1):
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.rsi_strategy = rsi_strategy
         self.data_manager = data_manager
+        self.broker = broker
 
         print_log("UI initialized")
 
@@ -153,7 +154,7 @@ class TradingFrame(MyFrame1):
         symbol = self.instrument_name.GetValue()
         qty = self.Quantity_input.GetValue()
 
-        self.data_manager.INSTRUMENT_TOKEN = symbol
+        self.data_manager.INSTRUMENT_TOKEN = (self.broker.tradingsymbol[symbol]).get("instrument_token")
         self.rsi_strategy.quantity = int(qty)
 
         print_log("Saved Instrument:", symbol, "Qty:", qty)
