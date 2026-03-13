@@ -30,7 +30,15 @@ class RSIStrategy:
         self.status = "inactive"   # inactive / active
         self.position = None       # LONG / SHORT
         self.quantity = None
+        self.ltp = 0.00
+        self.INSTRUMENT_TOKEN = None
 
+
+    def update_ltp(self,ltp_dict):
+        if(self.INSTRUMENT_TOKEN != None):
+            self.ltp = ltp_dict.get(self.INSTRUMENT_TOKEN, 0.00)
+            print_log("self.ltp -->>> ",self.ltp)
+        
 
     def update_indicators(self, rsi_15min, rsi_1hr):
         """
@@ -88,7 +96,7 @@ class RSIStrategy:
         """
         Strategy loop
         """
-        print_log("Run_Strategy")
+        # print_log("Run_Strategy")
         self.check_entry()
         self.check_exit()
 

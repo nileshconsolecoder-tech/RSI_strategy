@@ -64,7 +64,7 @@ def print_log(*args):
 
 class brokerSession:
     
-    def __init__(self, config_dict):
+    def __init__(self, config_dict,rsi_strategy):
         
         self.config_dict = config_dict
         
@@ -75,7 +75,7 @@ class brokerSession:
         
         self.access_token = None
         self.password = self.config_dict.get("password")
-        
+        self.rsi_strategy = rsi_strategy
         self.index_hub		    = {} 
         self.oc_hub 			= {}
         self.instrument_token_dict = {}
@@ -103,7 +103,8 @@ class brokerSession:
         self.download_instrument_tokens()
         # self.get_positions()
         # print_log("core part is done ")
-        # self.start_websocket()
+        self.start_websocket()
+        self.wx_instrument_token=None
 
     def do_login(self, api_key, api_secret):
         self.kite = KiteConnect(api_key=api_key)
@@ -652,7 +653,7 @@ class brokerSession:
             ltp = self.ltp_dict[token]
         except:
             self.kws.subscribe([token])
-            self.kws.set_mode(self.kws.MODE_FULL, [token])
+            self.kws.set_mode(self.kws.MODE_LTP, [token])
 
         return ltp
     
@@ -677,10 +678,11 @@ class brokerSession:
     def on_data(self, ws, ticks):
         
         for tick in ticks:
-            print_log(tick)
+            # print_log("Tick ----> ",tick)
             # print_log("\n")
             token = tick["instrument_token"]
             self.ltp_dict[token] = tick["last_price"]
+            self.rsi_strategy.update_ltp(self.ltp_dict)
             try:
                 if "depth" in tick:
                     buy_depth = tick["depth"].get("buy", [])
@@ -695,7 +697,7 @@ class brokerSession:
                         "ask_price": best_ask["price"],
                         "ask_qty": best_ask["quantity"] / self.freeze_lotsize_dict.get("NIFTY", {}).get("lot_size", 1),
                     }
-                    print_log("ws self.bid_ask_dict : ", self.bid_ask_dict)
+                    # print_log("ws self.bid_ask_dict : ", self.bid_ask_dict)
             except Exception as e:
                 print_log("Error in on_data depth processing:", e)
 
