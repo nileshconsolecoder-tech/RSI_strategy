@@ -8,7 +8,8 @@ import os
 import inspect
 import wx
 
-from lib.ui_design import MyFrame1
+# from lib.ui_design import MyFrame1
+from static.V2_ui import MyFrame1
 from lib.broker import brokerSession
 from lib.RSI_Strategy import RSIStrategy
 from lib.rsi_logic import RSI
@@ -153,6 +154,8 @@ class TradingFrame(MyFrame1):
 
         symbol = self.instrument_name.GetValue()
         qty = self.Quantity_input.GetValue()
+        symbol = symbol.upper()
+        print_log(symbol)
 
         self.data_manager.INSTRUMENT_TOKEN = (self.broker.tradingsymbol[symbol]).get("instrument_token")
         self.rsi_strategy.quantity = int(qty)
