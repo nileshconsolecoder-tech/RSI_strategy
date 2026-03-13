@@ -11,7 +11,7 @@ def print_log(*args):
         caller_name = "unknown"
     message_str = '[DM] ' + f'\033[94m[{caller_name}]\033[0m ' + ' '.join(map(str, args))
     full_message = f'{message_str}'
-    print(full_message)
+    # print(full_message)
     logging.info(full_message)
 
 

@@ -29,15 +29,18 @@ class RSIStrategy:
 
         self.status = "inactive"   # inactive / active
         self.position = None       # LONG / SHORT
-        self.quantity = None
+        self.quantity = 0
         self.ltp = 0.00
         self.INSTRUMENT_TOKEN = None
+        self.rsi_strategy_status = "ON"
+        self.Manual_EXIT = False
+        self.AVG = 0.00
 
 
     def update_ltp(self,ltp_dict):
         if(self.INSTRUMENT_TOKEN != None):
             self.ltp = ltp_dict.get(self.INSTRUMENT_TOKEN, 0.00)
-            print_log("self.ltp -->>> ",self.ltp)
+            # print_log("self.ltp -->>> ",self.ltp)
         
 
     def update_indicators(self, rsi_15min, rsi_1hr):
@@ -47,8 +50,7 @@ class RSIStrategy:
         self.rsi_15min = rsi_15min.get("RSI")
         self.rsi_1hr = rsi_1hr.get("RSI")
         self.rsi_ma_1hr = rsi_1hr.get("RSI_MA")
-        print_log("data --> ", self.rsi_15min,self.rsi_1hr,self.rsi_1hr)
-
+        print_log("data --> ", self.rsi_15min,self.rsi_1hr,self.rsi_ma_1hr)
 
     def check_entry(self):
         """
@@ -58,11 +60,13 @@ class RSIStrategy:
         if self.status == "inactive":
 
             if self.rsi_15min > 52 and self.rsi_1hr > self.rsi_ma_1hr:
+                self.AVG = self.ltp
                 self.place_order("LONG", "ENTRY")
                 self.position = "LONG"
                 self.status = "active"
 
             elif self.rsi_15min < 48 and self.rsi_1hr < self.rsi_ma_1hr:
+                self.AVG = self.ltp
                 self.place_order("SHORT", "ENTRY")
                 self.position = "SHORT"
                 self.status = "active"
@@ -97,14 +101,24 @@ class RSIStrategy:
         Strategy loop
         """
         # print_log("Run_Strategy")
-        self.check_entry()
-        self.check_exit()
+        if(self.rsi_strategy_status == "ON"):
+            print_log("RSI_strategy status : ",self.rsi_strategy_status)
+            self.check_entry()
+            self.check_exit()
+        else:
+            self.check_manual_exit()
+            print_log("RSI_strategy status : ",self.rsi_strategy_status)
 
+    
+    def check_manual_exit(self):
+        if(self.Manual_EXIT == True and self.status == "active"):
+            self.place_order(side=self.position,action="EXIT_MANUALLY")
+            print_log("SELF EXIT TRIGGER")
 
     def place_order(self, side, action):
         """
         Order execution placeholder
         Replace with broker API call
         """
-
-        print(f"{action} ORDER -> {side}")
+        self.order = side 
+        print(f"{action} ORDER -> {side} at AVG {self.AVG}")

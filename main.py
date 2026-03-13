@@ -9,11 +9,13 @@ import inspect
 import wx
 
 # from lib.ui_design import MyFrame1
-from static.V3_ui import *
+from static.V2_ui import *
 from lib.broker import brokerSession
 from lib.RSI_Strategy import RSIStrategy
 from lib.rsi_logic import RSI
 from lib.data_manager import DataManager
+
+from lib.trading_panel import TradingFrame
 
 
 # ==========================
@@ -52,7 +54,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-
 # ==========================
 # Load Config
 # ==========================
@@ -84,11 +85,13 @@ data_manager = DataManager(broker)
 rsi_logic = RSI(broker, data_manager, rsi_strategy)
 
 
+
 # ==========================
 # Async Event Loop (global)
 # ==========================
 
 loop = None
+
 
 
 # ==========================
@@ -112,9 +115,6 @@ async def strategy_worker(frame):
         await asyncio.sleep(1)
 
 
-# ==========================
-# Async Thread Starter
-# ==========================
 
 def start_async_loop():
 
@@ -127,125 +127,22 @@ def start_async_loop():
     loop.run_forever()
 
 
-# ==========================
-# Trading UI
-# ==========================
-
-class TradingFrame(MyFrame1):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.strategy_enabled = False
-        self.worker_started = False
-        self.Bind(wx.EVT_CLOSE, self.on_close)
-        self.rsi_strategy = rsi_strategy
-        self.data_manager = data_manager
-        self.broker = broker
-        print_log("UI initialized")
-
-    # ======================
-    # SAVE Button
-    # ======================
-    def on_save(self, event):
-        symbol = self.instrument_name.GetValue().upper()
-        qty = self.Quantity_input.GetValue()
-
-        print_log(symbol)
-        self.data_manager.INSTRUMENT_TOKEN = (self.broker.tradingsymbol[symbol]).get("instrument_token")
-        self.rsi_strategy.INSTRUMENT_TOKEN = (self.broker.tradingsymbol[symbol]).get("instrument_token")
-        self.rsi_strategy.quantity = int(qty)
-        ltp = broker.get_ltp(self.rsi_strategy.INSTRUMENT_TOKEN)
-        print_log("Saved Instrument:", symbol, "Qty:", qty,"LTP:",ltp )
-        
-        # Update status bar
-        self.status_dot.SetForegroundColour(COLOR_ACCENT_GREEN)
-        self.status_lbl.SetForegroundColour(COLOR_ACCENT_GREEN)
-        self.status_lbl.SetLabel(f"  ✔  Saved — {symbol}  |  Qty: {qty}")
-
-        if not self.worker_started:
-            asyncio.run_coroutine_threadsafe(
-                strategy_worker(self), loop
-            )
-            self.worker_started = True
-            print_log("Strategy loop started")
-
-    # ======================
-    # ON / OFF Toggle
-    # ======================
-    def on_toggle(self, event):
-        self.strategy_enabled = not self.strategy_enabled
-        if self.strategy_enabled:
-            self.On_Off.SetBackgroundColour(COLOR_TOGGLE_ON)
-            self.On_Off.SetLabel("● ACTIVE")
-            self.status_dot.SetForegroundColour(COLOR_ACCENT_GREEN)
-            self.status_lbl.SetForegroundColour(COLOR_ACCENT_GREEN)
-            self.status_lbl.SetLabel("  Strategy is LIVE — monitoring signals")
-            print_log("Strategy ENABLED")
-        else:
-            self.On_Off.SetBackgroundColour(COLOR_TOGGLE_OFF)
-            self.On_Off.SetLabel("● ON / OFF")
-            self.status_dot.SetForegroundColour(COLOR_TEXT_SECONDARY)
-            self.status_lbl.SetForegroundColour(COLOR_TEXT_SECONDARY)
-            self.status_lbl.SetLabel("  Strategy inactive — configure and press ON/OFF")
-            print_log("Strategy DISABLED")
-        self.On_Off.Refresh()
-
-    # ======================
-    # CLOSE
-    # ======================
-    def on_close(self, event):
-        global loop, running
-        print_log("Window close detected")
-        running = False
-        try:
-            if loop and loop.is_running():
-                loop.call_soon_threadsafe(loop.stop)
-                print_log("Async loop stopped")
-        except Exception as e:
-            print_log("Error stopping loop:", e)
-        self.Destroy()
-
-    # ======================
-    # Update RSI Display
-    # ======================
-    def update_rsi_display(self):
-        rsi15  = self.rsi_strategy.rsi_15min
-        rsi1h  = self.rsi_strategy.rsi_1hr
-        rsi_ma = self.rsi_strategy.rsi_ma_1hr
-        ltp = self.rsi_strategy.ltp
-        print_log(
-            "RSI15:", rsi_strategy.rsi_15min,
-            "RSI1H:", rsi_strategy.rsi_1hr,
-            "MA:",    rsi_strategy.rsi_ma_1hr,
-            "ltp", rsi_strategy.ltp
-        )
-
-        if rsi15 is not None:
-            self.rsi15_display.val.SetLabel(f"{rsi15:.2f}")
-
-        if rsi1h is not None:
-            self.rsi1h_display.val.SetLabel(f"{rsi1h:.2f}")
-
-        if rsi_ma is not None:
-            self.ma1h_display.val.SetLabel(f"{rsi_ma:.2f}")
-        
-        if ltp is not None:
-            self.ltp_display.val.SetLabel(f"{ltp:.2f}")
-
-# ==========================
-# Start Application
-# ==========================
-
 if __name__ == "__main__":
 
-    # Start asyncio worker thread
     worker_thread = threading.Thread(target=start_async_loop)
     worker_thread.start()
 
-    # Start UI
     app = wx.App(False)
 
-    frame = TradingFrame(None)
-
+    frame = TradingFrame(
+        None,
+        broker,
+        data_manager,
+        rsi_strategy,
+        rsi_logic,
+        loop
+    )
+    
     frame.SetTitle("RSI Trading Panel")
 
     frame.Show(True)
