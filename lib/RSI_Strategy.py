@@ -10,7 +10,7 @@ def print_log(*args):
     except (AttributeError, TypeError):
         caller_name = "unknown"
     
-    message_str = '[RSI_LG] ' + f'\033[94m[{caller_name}]\033[0m ' + ' '.join(map(str, args))
+    message_str = '[RSI_STG] ' + f'\033[94m[{caller_name}]\033[0m ' + ' '.join(map(str, args))
     full_message = f'{message_str}'
     
     print(full_message)
@@ -32,9 +32,11 @@ class RSIStrategy:
         self.quantity = 0
         self.ltp = 0.00
         self.INSTRUMENT_TOKEN = None
-        self.rsi_strategy_status = "ON"
+        self.rsi_strategy_status = "OFF"
         self.Manual_EXIT = False
         self.AVG = 0.00
+        self.rsi_15min_upper = 52
+        self.rsi_15min_lower = 48
 
 
     def update_ltp(self,ltp_dict):
@@ -50,22 +52,23 @@ class RSIStrategy:
         self.rsi_15min = rsi_15min.get("RSI")
         self.rsi_1hr = rsi_1hr.get("RSI")
         self.rsi_ma_1hr = rsi_1hr.get("RSI_MA")
-        print_log("data --> ", self.rsi_15min,self.rsi_1hr,self.rsi_ma_1hr)
+        # print_log("data --> ", self.rsi_15min,self.rsi_1hr,self.rsi_ma_1hr)
 
     def check_entry(self):
         """
         Entry logic
         """
+        # print_log("rsi range : ", self.rsi_15min_lower,self.rsi_15min_upper)
 
         if self.status == "inactive":
 
-            if self.rsi_15min > 52 and self.rsi_1hr > self.rsi_ma_1hr:
+            if self.rsi_15min > self.rsi_15min_upper and self.rsi_1hr > self.rsi_ma_1hr:
                 self.AVG = self.ltp
                 self.place_order("LONG", "ENTRY")
                 self.position = "LONG"
                 self.status = "active"
 
-            elif self.rsi_15min < 48 and self.rsi_1hr < self.rsi_ma_1hr:
+            elif self.rsi_15min < self.rsi_15min_lower and self.rsi_1hr < self.rsi_ma_1hr:
                 self.AVG = self.ltp
                 self.place_order("SHORT", "ENTRY")
                 self.position = "SHORT"
@@ -101,19 +104,28 @@ class RSIStrategy:
         Strategy loop
         """
         # print_log("Run_Strategy")
+
+        
         if(self.rsi_strategy_status == "ON"):
             print_log("RSI_strategy status : ",self.rsi_strategy_status)
             self.check_entry()
             self.check_exit()
-        else:
+        if(self.Manual_EXIT == True):
+            print_log("Manual_exit : ", self.Manual_EXIT)
             self.check_manual_exit()
-            print_log("RSI_strategy status : ",self.rsi_strategy_status)
+            self.Manual_EXIT = False
+            
 
     
     def check_manual_exit(self):
-        if(self.Manual_EXIT == True and self.status == "active"):
+        if(self.status == "active"):
             self.place_order(side=self.position,action="EXIT_MANUALLY")
             print_log("SELF EXIT TRIGGER")
+            self.position = None
+            self.status = "inactive"
+            self.AVG = 0.00
+            self.rsi_strategy_status = "OFF"
+            self.Manual_EXIT = False
 
     def place_order(self, side, action):
         """
@@ -121,4 +133,4 @@ class RSIStrategy:
         Replace with broker API call
         """
         self.order = side 
-        print(f"{action} ORDER -> {side} at AVG {self.AVG}")
+        print(f"{action} ORDER -> {side} at LTP  : {self.ltp}")

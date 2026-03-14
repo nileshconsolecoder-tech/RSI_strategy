@@ -8,8 +8,10 @@ import os
 import inspect
 import wx
 
+
+
 # from lib.ui_design import MyFrame1
-from static.V2_ui import *
+from static.loveable_ai_light_ui import *
 from lib.broker import brokerSession
 from lib.RSI_Strategy import RSIStrategy
 from lib.rsi_logic import RSI
@@ -91,29 +93,6 @@ rsi_logic = RSI(broker, data_manager, rsi_strategy)
 # ==========================
 
 loop = None
-
-
-
-# ==========================
-# Strategy Worker
-# ==========================
-async def strategy_worker(frame):
-
-    print_log("RSI worker started")
-
-    while True:
-
-        try:
-
-            await rsi_logic.get_RSI()
-            wx.CallAfter(frame.update_rsi_display)
-
-        except Exception as e:
-
-            print_log("Strategy error:", e)
-
-        await asyncio.sleep(1)
-
 
 
 def start_async_loop():

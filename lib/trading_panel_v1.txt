@@ -1,0 +1,491 @@
+import wx
+import asyncio
+import inspect
+import datetime
+import logging
+from static.loveable_ai_light_ui import TradingDashboard
+
+def print_log(*args):
+    try:
+        caller_name = inspect.currentframe().f_back.f_code.co_name
+    except (AttributeError, TypeError):
+        caller_name = "unknown"
+    message_str = '[TP] ' + f'\033[94m[{caller_name}]\033[0m ' + ' '.join(map(str, args))
+    print(message_str)
+    logging.info(message_str)
+
+
+class TradingFrame(TradingDashboard):
+
+    def __init__(self, parent, broker, data_manager, rsi_strategy, rsi_logic, loop):
+
+        super().__init__(parent)
+
+        self.broker = broker
+        self.data_manager = data_manager
+        self.rsi_strategy = rsi_strategy
+        self.rsi_logic = rsi_logic
+        self.loop = loop
+
+        self.worker_started = False
+
+        # Enable ENTER detection on symbol input
+        self.instrument_name.SetWindowStyleFlag(wx.TE_PROCESS_ENTER)
+
+        # ── Bind Events ──────────────────────────────────────
+        self.instrument_name.Bind(wx.EVT_TEXT_ENTER, self.on_symbol_enter)
+        self.save_btn.Bind(wx.EVT_BUTTON, self.on_save)           # was: self.save
+        self.on_off_btn.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_strategy)  # was: self.On_Off
+        self.exit_btn.Bind(wx.EVT_BUTTON, self.on_exit_position)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+
+        print_log("UI Ready")
+
+
+    # ==========================
+    # Symbol ENTER
+    # ==========================
+
+    def on_symbol_enter(self, event):
+
+        symbol = self.instrument_name.GetValue().upper()
+
+        try:
+            token = self.broker.tradingsymbol[symbol]["instrument_token"]
+            ltp = self.broker.get_ltp(token)
+
+            self.data_manager.INSTRUMENT_TOKEN = token
+            self.rsi_strategy.INSTRUMENT_TOKEN = token
+            self.rsi_strategy.ltp = ltp
+
+            # ── Update LTP with built-in flash animation ──
+            self.update_ltp(ltp)                              # was: self.m_staticText4.SetLabel(...)
+
+            # ── Update status bar symbol field ──
+            self.sym_val.SetLabel(symbol)                     # NEW
+
+            print_log("Symbol Loaded:", symbol)
+
+            if not self.worker_started:
+                asyncio.run_coroutine_threadsafe(
+                    self.strategy_worker(), self.loop
+                )
+                self.worker_started = True
+
+        except Exception as e:
+            print_log("Symbol error:", e)
+
+
+    # ==========================
+    # Strategy Worker
+    # ==========================
+
+    async def strategy_worker(self):
+
+        while True:
+            try:
+                await self.rsi_logic.get_RSI()
+                self.rsi_strategy.run_strategy()
+                wx.CallAfter(self.update_rsi_display)
+
+            except Exception as e:
+                print_log("Worker error:", e)
+
+            await asyncio.sleep(1)
+
+
+    # ==========================
+    # Save Config
+    # ==========================
+
+    def on_save(self, event):                                 # was: on_save bound to self.save
+
+        qty = self.quantity_input.GetValue()                  # was: self.Quantity_input
+        rsi_upper = self.rsi_upper_input.GetValue()
+        rsi_lower = self.rsi_lower_input.GetValue()
+
+        if qty == "":
+            return
+
+        self.rsi_strategy.quantity = int(qty)
+
+        # ── Sync status bar after save ──
+        self.update_status_bar()                              # NEW
+
+        print_log("Config saved — qty:", qty,
+                  "RSI:", rsi_lower, "–", rsi_upper)
+
+
+    # ==========================
+    # Toggle Strategy
+    # ==========================
+
+    def toggle_strategy(self, event):                        # was: bound to self.On_Off
+
+        if self.on_off_btn.GetValue():                       # was: self.On_Off.GetValue()
+            self.rsi_strategy.rsi_strategy_status = "ON"
+            self.status_val.SetLabel("● ON")                 # NEW — was never updated
+            print_log("Strategy ON")
+
+        else:
+            self.rsi_strategy.rsi_strategy_status = "OFF"
+            self.status_val.SetLabel("○ OFF")                # NEW
+            print_log("Strategy OFF")
+
+        self.status_val.Refresh()
+
+
+    # ==========================
+    # Update RSI Display
+    # ==========================
+
+    def update_rsi_display(self):
+
+        rsi15 = self.rsi_strategy.rsi_15min
+        rsi1h  = self.rsi_strategy.rsi_1hr
+        rsi_ma = self.rsi_strategy.rsi_ma_1hr
+        ltp    = self.rsi_strategy.ltp
+
+        if rsi15 is not None:
+            self.rsi_15_value.SetLabel(f"{rsi15:.2f}")       # was: self.m_staticText7
+
+        if rsi1h is not None:
+            self.rsi_1h_value.SetLabel(f"{rsi1h:.2f}")       # was: self.m_staticText9
+
+        if rsi_ma is not None:
+            self.ma_1h_value.SetLabel(f"{rsi_ma:.2f}")       # was: self.m_staticText11
+
+        if ltp is not None:
+            self.update_ltp(ltp)                             # was: self.m_staticText4.SetLabel(...)
+                                                             # now uses built-in flash animation
+
+        # ── Update last update timestamp ──
+        self.update_val.SetLabel(                            # NEW
+            datetime.datetime.now().strftime("%H:%M")
+        )
+
+
+    # ==========================
+    # Update Status Bar         ← NEW FUNCTION
+    # ==========================
+
+    def update_status_bar(self):
+        """Sync status bar widgets after save or symbol load."""
+
+        qty     = self.quantity_input.GetValue()             # was: self.Quantity_input
+        rsi_up  = self.rsi_upper_input.GetValue()
+        rsi_low = self.rsi_lower_input.GetValue()
+        symbol  = self.instrument_name.GetValue().upper()
+
+        if symbol:
+            self.sym_val.SetLabel(symbol)
+
+        if qty:
+            self.qty_val.SetLabel(qty)
+
+        if rsi_up and rsi_low:
+            self.rsi_range_val.SetLabel(f"{rsi_low} – {rsi_up}")
+
+
+    # ==========================
+    # Update Trade Grid          ← NEW FUNCTION
+    # ==========================
+
+    def update_trade_grid(self, trades: list):
+        """
+        Populate trade grid from order log.
+
+        trades: list of dicts, each with keys:
+            transaction, qty, avg, ltp, status
+        Example:
+            [
+                {"transaction": "BUY",  "qty": "50",
+                 "avg": "1245.50", "ltp": "1248.20", "status": "OPEN"},
+                {"transaction": "SELL", "qty": "30",
+                 "avg": "1250.00", "ltp": "1248.20", "status": "CLOSED"},
+            ]
+        """
+        from Loveable_V1_light import (
+            COLOR_SUCCESS, COLOR_DANGER,
+            COLOR_WARNING, TEXT_MUTED
+        )
+
+        for r, trade in enumerate(trades):
+            if r >= self.trade_grid.GetNumberRows():
+                break
+
+            self.trade_grid.SetCellValue(r, 0, trade.get("transaction", ""))
+            self.trade_grid.SetCellValue(r, 1, trade.get("qty", ""))
+            self.trade_grid.SetCellValue(r, 2, trade.get("avg", ""))
+            self.trade_grid.SetCellValue(r, 3, trade.get("ltp", ""))
+            self.trade_grid.SetCellValue(r, 4, trade.get("status", ""))
+
+            # Color: Transaction column
+            txn = trade.get("transaction", "")
+            self.trade_grid.SetCellTextColour(
+                r, 0,
+                COLOR_SUCCESS if txn == "BUY" else COLOR_DANGER
+            )
+
+            # Color: Status column
+            status = trade.get("status", "")
+            self.trade_grid.SetCellTextColour(
+                r, 4,
+                COLOR_WARNING if status == "OPEN" else TEXT_MUTED
+            )
+
+        self.trade_grid.Refresh()
+
+
+    # ==========================
+    # Last Action Helper         ← NEW FUNCTION
+    # ==========================
+
+    def set_last_action(self, action: str):
+        """
+        Call this from your strategy after any order event.
+        Example: self.ui.set_last_action("BUY @ 1245.50")
+        """
+        self.action_val.SetLabel(action)
+        self.action_val.Refresh()
+
+
+    # ==========================
+    # Exit Position
+    # ==========================
+
+    def on_exit_position(self, event):
+
+        print_log("Manual exit triggered")
+
+        if self.rsi_strategy.status == "active":
+            self.rsi_strategy.Manual_EXIT = True
+            self.set_last_action("Manual EXIT")             # NEW — update action display
+
+        else:
+            print_log("No active position")
+
+
+    # ==========================
+    # Close App
+    # ==========================
+
+    def on_close(self, event):
+
+        print_log("Closing app")
+
+        try:
+            if self.loop and self.loop.is_running():
+                self.loop.call_soon_threadsafe(self.loop.stop)
+        except:
+            pass
+
+        self.Destroy()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# import wx
+# import asyncio
+# import inspect
+# from static.v4_ui import MyFrame1
+# import logging
+
+# def print_log(*args):
+#     try:
+#         caller_name = inspect.currentframe().f_back.f_code.co_name
+#     except (AttributeError, TypeError):
+#         caller_name = "unknown"
+    
+#     message_str = '[TP] ' + f'\033[94m[{caller_name}]\033[0m ' + ' '.join(map(str, args))
+#     full_message = f'{message_str}'
+    
+#     print(full_message)
+#     logging.info(full_message)
+
+
+# class TradingFrame(MyFrame1):
+
+#     def __init__(self, parent, broker, data_manager, rsi_strategy, rsi_logic, loop):
+
+#         super().__init__(parent)
+
+#         self.broker = broker
+#         self.data_manager = data_manager
+#         self.rsi_strategy = rsi_strategy
+#         self.rsi_logic = rsi_logic
+#         self.loop = loop
+
+#         self.worker_started = False
+
+#         # enable ENTER detection
+#         self.instrument_name.SetWindowStyleFlag(wx.TE_PROCESS_ENTER)
+
+#         # Bind events
+#         self.instrument_name.Bind(wx.EVT_TEXT_ENTER, self.on_symbol_enter)
+#         self.save.Bind(wx.EVT_BUTTON, self.on_save)
+#         self.On_Off.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_strategy)
+#         # self.exit_btn.Bind(wx.EVT_BUTTON, self.on_close)
+#         self.Bind(wx.EVT_CLOSE, self.on_close)
+
+#         self.On_Off.SetLabel("OFF")
+#         self.exit_btn.Bind(wx.EVT_BUTTON, self.on_exit_position)
+#         print_log("UI Ready")
+
+
+#     # ==========================
+#     # Symbol ENTER
+#     # ==========================
+
+#     def on_symbol_enter(self, event):
+
+#         symbol = self.instrument_name.GetValue().upper()
+
+#         try:
+
+#             token = self.broker.tradingsymbol[symbol]["instrument_token"]
+#             ltp = self.broker.get_ltp(token)
+#             self.data_manager.INSTRUMENT_TOKEN = token
+#             self.rsi_strategy.INSTRUMENT_TOKEN = token
+
+
+#             self.rsi_strategy.ltp = ltp
+
+#             self.m_staticText4.SetLabel(f"{ltp:.2f}")
+
+#             print_log("Symbol Loaded:", symbol)
+
+#             if not self.worker_started:
+
+#                 asyncio.run_coroutine_threadsafe(
+#                     self.strategy_worker(), self.loop
+#                 )
+
+#                 self.worker_started = True
+
+#         except Exception as e:
+
+#             print_log("Symbol error:", e)
+
+
+#     # ==========================
+#     # Strategy Worker
+#     # ==========================
+
+#     async def strategy_worker(self):
+
+#         while True:
+
+#             try:
+
+#                 await self.rsi_logic.get_RSI()
+
+#                 self.rsi_strategy.run_strategy()
+
+#                 wx.CallAfter(self.update_rsi_display)
+
+#             except Exception as e:
+
+#                 print_log("Worker error:", e)
+
+#             await asyncio.sleep(1)
+
+
+#     # ==========================
+#     # Save Quantity
+#     # ==========================
+
+#     def on_save(self, event):
+
+#         qty = self.Quantity_input.GetValue()
+
+#         if qty == "":
+#             return
+
+#         self.rsi_strategy.quantity = int(qty)
+
+#         print_log("Quantity saved:", qty)
+
+
+#     # ==========================
+#     # Toggle Strategy
+#     # ==========================
+
+#     def toggle_strategy(self, event):
+
+#         if self.On_Off.GetValue():
+
+#             self.On_Off.SetLabel("ON")
+#             self.rsi_strategy.rsi_strategy_status = "ON"
+
+#             print_log("Strategy ON")
+
+#         else:
+
+#             self.On_Off.SetLabel("OFF")
+#             self.rsi_strategy.rsi_strategy_status = "OFF"
+
+#             print_log("Strategy OFF")
+
+
+#     # ==========================
+#     # Update UI
+#     # ==========================
+
+#     def update_rsi_display(self):
+
+#         rsi15 = self.rsi_strategy.rsi_15min
+#         rsi1h = self.rsi_strategy.rsi_1hr
+#         rsi_ma = self.rsi_strategy.rsi_ma_1hr
+#         ltp = self.rsi_strategy.ltp
+
+#         if rsi15 is not None:
+#             self.m_staticText7.SetLabel(f"{rsi15:.2f}")
+
+#         if rsi1h is not None:
+#             self.m_staticText9.SetLabel(f"{rsi1h:.2f}")
+
+#         if rsi_ma is not None:
+#             self.m_staticText11.SetLabel(f"{rsi_ma:.2f}")
+
+#         if ltp is not None:
+#             self.m_staticText4.SetLabel(f"{ltp:.2f}")
+
+
+#     # ==========================
+#     # Close App
+#     # ==========================
+
+#     def on_close(self, event):
+
+#         print_log("Closing app")
+
+#         try:
+#             if self.loop and self.loop.is_running():
+#                 self.loop.call_soon_threadsafe(self.loop.stop)
+#         except:
+#             pass
+
+#         self.Destroy()
+
+#     def on_exit_position(self, event):
+
+#         print_log("Manual exit triggered")
+
+#         if self.rsi_strategy.status == "active":
+
+#             self.rsi_strategy.Manual_EXIT = True
+
+#         else:
+
+#             print_log("No active position")

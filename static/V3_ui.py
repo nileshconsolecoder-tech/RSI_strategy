@@ -130,10 +130,10 @@ class MyFrame1(wx.Frame):
 
         gbSizer11.Add(self.m_grid1, wx.GBPosition(0, 0), wx.GBSpan(2, 2), wx.ALL, 10)
 
-        self.m_button4 = wx.Button(self, wx.ID_ANY, _("EXIT"))
-        self.m_button4.SetBackgroundColour(wx.Colour(255, 51, 51))
+        self.exit_btn = wx.Button(self, wx.ID_ANY, _("EXIT"))
+        self.exit_btn.SetBackgroundColour(wx.Colour(255, 51, 51))
 
-        gbSizer11.Add(self.m_button4, wx.GBPosition(0, 3), wx.GBSpan(2, 1), wx.ALL, 20)
+        gbSizer11.Add(self.exit_btn, wx.GBPosition(0, 3), wx.GBSpan(2, 1), wx.ALL, 20)
 
         # FIXED ROW SPAN (was 0 before)
         gbSizer1.Add(gbSizer11, wx.GBPosition(4, 0), wx.GBSpan(1, 3), wx.EXPAND, 5)
